@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clash Royale - UI Pestañas</title>
+    <style>
+        :root { 
+            --elixir: #ff00ff; 
+            --card-blue: linear-gradient(180deg, #5dade2, #2980b9);
+            --card-gray: linear-gradient(180deg, #7f8c8d, #34495e);
+            --bg-lobby: #27ae60;
+            --nav-bg: #1a1a1a;
+            --nav-active: #f1c40f;
+        }
+        body { background: #111; margin: 0; font-family: 'Arial Black', sans-serif; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        
+        #main-app { width: 400px; height: 850px; background: #2c3e50; border-radius: 40px; border: 10px solid #1a1a1a; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* --- ESTADOS DE VISTA --- */
+        .tab-view { display: none; width: 100%; height: 100%; flex-direction: column; overflow-y: auto; padding-bottom: 70px; /* Espacio para navbar */ }
+        .tab-view.active { display: flex; }
+        
+        #game-view { display: none; width: 100%; height: 100%; position: absolute; top:0; left:0; z-index: 100; flex-direction: column; background: #212f3c; }
+        #game-view.active { display: flex; }
+
+        /* --- PESTAÑA 1: BATALLA (HOME) --- */
+        #tab-battle { background: var(--bg-lobby); align-items: center; padding-top: 20px; }
+        
+        .cups-panel { background: rgba(0,0,0,0.4); padding: 15px 40px; border-radius: 20px; text-align: center; border: 2px solid gold; margin-bottom: 20px; }
+        .cups-big { font-size: 36px; color: gold; text-shadow: 0 3px black; display: block; }
+        
+        #arena-road-container { width: 90%; flex-grow: 1; background: rgba(0,0,0,0.3); border-radius: 10px; overflow-y: auto; padding: 10px; margin-bottom: 10px; border: 2px solid #444; }
+        
+        .arena-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.1); border-radius: 8px; border-left: 5px solid #555; font-size: 13px; }
+        .arena-item.unlocked { background: rgba(46, 204, 113, 0.3); border-left-color: #2ecc71; }
+        .arena-item.current { background: rgba(241, 196, 15, 0.3); border-left-color: #f1c40f; border: 2px solid gold; transform: scale(1.02); font-weight: bold; }
+
+        .battle-btn { width: 80%; padding: 20px; background: #e74c3c; color: #fff; border: none; border-bottom: 6px solid #c0392b; border-radius: 12px; font-size: 28px; cursor: pointer; font-weight: bold; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: transform 0.1s; }
+        .battle-btn:active { border-bottom: 2px solid #c0392b; transform: translateY(4px); }
+
+        /* --- PESTAÑA 2: MAZO (DECK) --- */
+        #tab-deck { background: #34495e; align-items: center; padding-top: 10px; }
+        
+        .deck-header { text-align: center; margin-bottom: 10px; width: 100%; }
+        .current-deck-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 15px; width: 90%; }
+        .deck-slot { width: 60px; height: 80px; background: rgba(0,0,0,0.5); border: 2px dashed #7f8c8d; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #aaa; position: relative; }
+        .deck-slot .pool-card { margin: 0; width: 100%; height: 100%; border: none; } /* Ajuste tarjeta dentro de slot */
+
+        .collection-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 10px; width: 95%; }
+        
+        .pool-card { width: 55px; height: 75px; background: var(--card-gray); border: 2px solid #555; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative; transition: 0.1s; }
+        .pool-card.in-deck { filter: grayscale(1); opacity: 0.5; } 
+        .pool-card:hover { transform: scale(1.1); z-index: 10; }
+        .card-cost { position: absolute; top: -6px; left: -6px; background: var(--elixir); width: 18px; height: 18px; border-radius: 50%; font-size: 11px; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+
+        /* --- BARRA NAVEGACIÓN --- */
+        .nav-bar { position: absolute; bottom: 0; width: 100%; height: 60px; background: var(--nav-bg); display: flex; border-top: 2px solid #444; z-index: 50; }
+        .nav-btn { flex: 1; background: none; border: none; color: #7f8c8d; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+        .nav-btn span { font-size: 20px; }
+        .nav-btn.active { color: var(--nav-active); background: rgba(255,255,255,0.05); border-top: 3px solid var(--nav-active); }
+
+        /* --- ARENA (JUEGO) --- */
+        #arena { width: 350px; height: 550px; background: #4caf50; border: 6px solid #3e2723; border-radius: 20px; position: relative; overflow: hidden; margin-top: 10px; margin-left: auto; margin-right: auto;}
+        
+        .river { position: absolute; top: 50%; width: 100%; height: 50px; background: #3498db; transform: translateY(-50%); border-top: 4px solid #2980b9; border-bottom: 4px solid #2980b9; z-index: 1; }
+        .bridge { position: absolute; top: 50%; width: 50px; height: 60px; background: #8d6e63; transform: translateY(-50%); z-index: 2; border-left: 3px solid #5d4037; border-right: 3px solid #5d4037; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        
+        .tower { position: absolute; z-index: 5; display: flex; flex-direction: column; align-items: center; width: 60px; }
+        .hp-container { position: absolute; top: -25px; width: 50px; height: 8px; background: #000; border: 2px solid #fff; border-radius: 4px; z-index: 20; overflow: hidden; }
+        .hp-fill { height: 100%; background: #2ecc71; width: 100%; transition: width 0.1s; }
+        .tower-top { width: 100%; height: 15px; background: #333; border-radius: 4px 4px 0 0; position: relative; z-index: 6; }
+        .tower-body { width: 80%; height: 40px; border: 3px solid #1a1a1a; position: relative; display: flex; justify-content: center; align-items: center; font-size: 24px; z-index: 5; transition: 0.3s; }
+        
+        .tower.player .tower-body { background: #2980b9; }
+        .tower.enemy .tower-body { background: #c0392b; }
+
+        .unit { position: absolute; z-index: 10; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 2px solid white; transition: transform 0.1s; }
+        .unit.flying { box-shadow: 10px 10px 15px rgba(0,0,0,0.6); z-index: 20; transform: scale(1.1); }
+        .unit:not(.flying) { box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+
+        .unit-hp { position: absolute; top: -10px; width: 24px; height: 4px; background: #000; }
+        .unit-hp .fill { width: 100%; height: 100%; background: #2ecc71; }
+
+        .elixir-ui { width: 100%; display: flex; align-items: center; padding: 10px 20px; gap: 10px; box-sizing: border-box; }
+        .elixir-orb { width: 45px; height: 45px; background: radial-gradient(circle, #ff66ff, #990099); border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; }
+        .elixir-bar { flex-grow: 1; height: 20px; background: #1a1a1a; border: 2px solid #fff; border-radius: 12px; position: relative; overflow: hidden; }
+        #elixir-progress { height: 100%; background: var(--elixir); width: 0%; transition: width 0.1s linear; }
+
+        #end-overlay { display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; }
+        #end-msg { font-size: 50px; text-shadow: 0 5px #000; margin-bottom: 10px; font-weight: 900; }
+        
+        .hand-card { width: 65px; height: 85px; background: var(--card-blue); border: 3px solid #fff; border-radius: 10px; position: relative; display: flex; justify-content: center; align-items: center; font-size: 24px; cursor: pointer; transition: 0.2s; }
+        .hand-card.active { transform: translateY(-15px); border-color: #2ecc71; }
+        
+        .arrow { width: 14px; height: 4px; background: #ffeb3b; position: absolute; border: 1px solid #e67e22; z-index: 25; border-radius: 2px; box-shadow: 0 0 2px black; pointer-events: none; }
+        .fireball { width: 10px; height: 10px; background: orange; border-radius: 50%; position: absolute; border: 2px solid red; z-index: 25; box-shadow: 0 0 5px orange; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div id="main-app">
+    
+    <div id="tab-battle" class="tab-view active">
+        <div class="cups-panel">
+            <span style="font-size:14px; color:#ccc;">TUS COPAS</span>
+            <span id="cup-count" class="cups-big">0</span>
+        </div>
+
+        <div id="arena-road-container">
+            <div id="arena-list"></div>
+        </div>
+
+        <button class="battle-btn" onclick="goToArena()">¡BATALLA!</button>
+    </div>
+
+    <div id="tab-deck" class="tab-view">
+        <div class="deck-header">
+            <h3 style="margin:5px; color:#f1c40f;">MAZO DE BATALLA</h3>
+            <span style="font-size:10px; color:#aaa;">Selecciona cartas para armar tu equipo</span>
+        </div>
+
+        <div class="current-deck-row" id="current-deck-display">
+            </div>
+
+        <div style="width:90%; height:2px; background:#555; margin:10px 0;"></div>
+
+        <h4 style="margin:5px; align-self:flex-start; margin-left:20px;">COLECCIÓN</h4>
+        <div id="deck-pool" class="collection-grid">
+            </div>
+    </div>
+
+    <div id="game-view">
+        <div id="arena" onclick="spawnPlayerUnit(event)">
+            <div class="river"></div>
+            <div class="bridge" style="left: 65px;"></div>
+            <div class="bridge" style="right: 65px;"></div>
+            <div id="entities-layer"></div>
+        </div>
+
+        <div class="elixir-ui">
+            <div class="elixir-orb" id="elixir-text">5</div>
+            <div class="elixir-bar">
+                <div id="elixir-progress"></div>
+            </div>
+        </div>
+        <div id="hand" style="display: flex; gap: 8px; justify-content:center; margin-bottom: 15px;"></div>
+
+        <div id="end-overlay">
+            <h1 id="end-msg">RESULTADO</h1>
+            <div id="cups-change" style="font-size:30px; margin-bottom:20px; font-weight:bold;"></div>
+            <button onclick="returnToLobby()" style="padding: 15px 30px; cursor: pointer; background: #95a5a6; color: white; border: none; border-radius: 8px;">Continuar</button>
+        </div>
+    </div>
+
+    <div class="nav-bar" id="nav-bar">
+        <button class="nav-btn active" onclick="switchTab('battle')" id="btn-battle">
+            <span>⚔️</span> Batalla
+        </button>
+        <button class="nav-btn" onclick="switchTab('deck')" id="btn-deck">
+            <span>🃏</span> Cartas
+        </button>
+    </div>
+
+</div>
+
+<script>
+    // DATOS DE CARTAS (Incluyendo voladores y nerfs)
+    const DATA = {
+        knight: { name: 'Caballero', cost: 3, hp: 600, dmg: 75, spd: 0.5, range: 40, sym: '🛡️', type: 'melee', flying: false },
+        archer: { name: 'Arquera', cost: 3, hp: 150, dmg: 45, spd: 0.55, range: 160, sym: '🏹', type: 'range', flying: false },
+        giant: { name: 'Gigante', cost: 5, hp: 2550, dmg: 180, spd: 0.3, range: 45, sym: 'siege', flying: false },
+        valkyrie: { name: 'Valquiria', cost: 4, hp: 630, dmg: 100, spd: 0.55, range: 60, sym: '🪓', type: 'area', flying: false },
+        pekka: { name: 'P.E.K.K.A', cost: 7, hp: 1600, dmg: 220, spd: 0.25, range: 45, sym: '🤖', type: 'melee', flying: false },
+        skeletons: { name: 'Esq. Guerreros', cost: 5, hp: 1, dmg: 15, spd: 0.55, range: 30, sym: '💀', type: 'melee', count: 25, flying: false },
+        
+        goblins: { name: 'Duendes', cost: 2, hp: 80, dmg: 50, spd: 0.8, range: 30, sym: '👺', type: 'melee', count: 3, flying: false },
+        hog: { name: 'Montapuercos', cost: 4, hp: 800, dmg: 160, spd: 0.9, range: 40, sym: '🐷', type: 'siege', flying: false },
+        wizard: { name: 'Mago', cost: 5, hp: 350, dmg: 120, spd: 0.5, range: 140, sym: '🧙‍♂️', type: 'range', splash: true, flying: false },
+        musketeer: { name: 'Mosquetera', cost: 4, hp: 350, dmg: 110, spd: 0.5, range: 180, sym: '🔫', type: 'range', flying: false },
+        prince: { name: 'Príncipe', cost: 5, hp: 900, dmg: 200, spd: 0.7, range: 40, sym: '🤴', type: 'melee', flying: false },
+        icegolem: { name: 'Golem Hielo', cost: 2, hp: 600, dmg: 20, spd: 0.3, range: 40, sym: '🧊', type: 'siege', flying: false },
+        cannon: { name: 'Cañón', cost: 3, hp: 600, dmg: 100, spd: 0, range: 150, sym: '💣', type: 'building', flying: false },
+
+        minions: { name: 'Esbirros', cost: 3, hp: 90, dmg: 40, spd: 0.7, range: 30, sym: '🦇', type: 'melee', count: 3, flying: true },
+        baby: { name: 'Bebé Dragón', cost: 4, hp: 700, dmg: 80, spd: 0.55, range: 100, sym: '🐉', type: 'range', splash: true, flying: true },
+        balloon: { name: 'Globo', cost: 5, hp: 1000, dmg: 400, spd: 0.3, range: 40, sym: '🎈', type: 'siege', flying: true }
+    };
+
+    const ARENAS = [
+        { name: "Entrenamiento", min: 0 }, { name: "Estadio Duende", min: 300 }, { name: "Foso de Huesos", min: 600 },
+        { name: "Coliseo Bárbaro", min: 900 }, { name: "Fuerte del P.E.K.K.A", min: 1200 }, { name: "Valle de Hechizos", min: 1500 },
+        { name: "Legendaria", min: 2000 }
+    ];
+
+    let playerDeck = ['baby', 'skeletons', 'musketeer', 'giant']; 
+    const MAX_DECK_SIZE = 4;
+    let playerCups = parseInt(localStorage.getItem('clashCups')) || 0;
+    
+    // Variables de juego
+    let gameLoopInterval, aiLoopInterval;
+    let playerElixir = 5, selected = null, entities = [], towers = [], gameOver = false;
+
+    // --- SISTEMA DE PESTAÑAS ---
+    function switchTab(tabName) {
+        // Ocultar todos
+        document.querySelectorAll('.tab-view').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+        // Mostrar seleccionado
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        document.getElementById(`btn-${tabName}`).classList.add('active');
+        
+        // Si vamos a Deck, refrescar la vista
+        if(tabName === 'deck') renderDeckView();
+    }
+
+    // --- LOBBY LOGIC ---
+    function initLobby() {
+        // Actualizar datos de batalla (Pestaña 1)
+        document.getElementById('cup-count').innerText = playerCups;
+        const list = document.getElementById('arena-list');
+        list.innerHTML = '';
+        ARENAS.forEach((a, index) => {
+            const div = document.createElement('div');
+            let statusClass = '';
+            let icon = '🔒';
+            if (playerCups >= a.min) { statusClass = 'unlocked'; icon = '✅'; }
+            const nextArena = ARENAS[index + 1];
+            if (playerCups >= a.min && (!nextArena || playerCups < nextArena.min)) { statusClass = 'current'; icon = '📍'; }
+            div.className = `arena-item ${statusClass}`;
+            div.innerHTML = `<div><span style="margin-right:5px;">${icon}</span><b>${a.name}</b></div><div>${a.min}+</div>`;
+            list.appendChild(div);
+            if(statusClass === 'current') setTimeout(() => div.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        });
+
+        // Inicializar vista de mazo
+        renderDeckView();
+    }
+
+    function renderDeckView() {
+        const deckRow = document.getElementById('current-deck-display');
+        const poolGrid = document.getElementById('deck-pool');
+        deckRow.innerHTML = '';
+        poolGrid.innerHTML = '';
+
+        // 1. Renderizar Mazo Actual (Top)
+        for(let i=0; i<MAX_DECK_SIZE; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'deck-slot';
+            const cardKey = playerDeck[i];
+            
+            if(cardKey) {
+                // Hay carta
+                slot.innerHTML = getCardHTML(cardKey, false);
+                slot.onclick = () => removeFromDeck(cardKey);
+            } else {
+                // Hueco vacío
+                slot.innerText = "Vacío";
+            }
+            deckRow.appendChild(slot);
+        }
+
+        // 2. Renderizar Colección (Bottom)
+        Object.keys(DATA).forEach(key => {
+            const inDeck = playerDeck.includes(key);
+            const cardDiv = document.createElement('div');
+            cardDiv.className = `pool-card ${inDeck ? 'in-deck' : ''}`;
+            cardDiv.innerHTML = getCardHTML(key, true);
+            cardDiv.onclick = () => addToDeck(key);
+            poolGrid.appendChild(cardDiv);
+        });
+    }
+
+    function getCardHTML(key, showName) {
+        return `
+            <div class="card-cost">${DATA[key].cost}</div>
+            <div style="font-size:24px;">${DATA[key].sym}</div>
+            ${showName ? `<div style="font-size:8px; font-weight:bold; width:100%; text-align:center; overflow:hidden;">${DATA[key].name}</div>` : ''}
+        `;
+    }
+
+    function addToDeck(key) {
+        if(playerDeck.includes(key)) return; // Ya está
+        if(playerDeck.length >= MAX_DECK_SIZE) return alert("¡Mazo lleno! Toca una carta de arriba para quitarla.");
+        playerDeck.push(key);
+        renderDeckView();
+    }
+
+    function removeFromDeck(key) {
+        const idx = playerDeck.indexOf(key);
+        if(idx > -1) {
+            playerDeck.splice(idx, 1);
+            renderDeckView();
+        }
+    }
+
+    // --- TRANSICIONES BATALLA ---
+    function goToArena() {
+        if(playerDeck.length < MAX_DECK_SIZE) return alert("¡Necesitas 4 cartas para luchar!");
+        
+        // Esconder Lobby y Nav
+        document.querySelectorAll('.tab-view').forEach(t => t.classList.remove('active'));
+        document.getElementById('nav-bar').style.display = 'none';
+        
+        // Mostrar Juego
+        document.getElementById('game-view').classList.add('active');
+        initGame();
+    }
+
+    function returnToLobby() {
+        stopGame();
+        document.getElementById('end-overlay').style.display = 'none';
+        document.getElementById('game-view').classList.remove('active');
+        
+        // Mostrar Lobby y Nav
+        document.getElementById('nav-bar').style.display = 'flex';
+        switchTab('battle'); // Volver a pantalla principal
+        initLobby(); // Actualizar copas
+    }
+
+    // --- GAME ENGINE (Misma lógica anterior) ---
+    function stopGame() {
+        clearInterval(gameLoopInterval);
+        clearInterval(aiLoopInterval);
+        document.getElementById('entities-layer').innerHTML = '';
+        document.getElementById('arena').innerHTML = `
+            <div class="river"></div>
+            <div class="bridge" style="left: 65px;"></div>
+            <div class="bridge" style="right: 65px;"></div>
+            <div id="entities-layer"></div>
+        `;
+    }
+
+    function initGame() {
+        gameOver = false;
+        entities = [];
+        playerElixir = 4; 
+        
+        towers = [
+            { id: 'ek', team: 'enemy', x: 175, y: 60, hp: 3000, max: 3000, type: 'king', range: 180, dmg: 80, lastAtk: 0 },
+            { id: 'el', team: 'enemy', x: 80, y: 110, hp: 1800, max: 1800, type: 'princess', range: 160, dmg: 60, lastAtk: 0 },
+            { id: 'er', team: 'enemy', x: 270, y: 110, hp: 1800, max: 1800, type: 'princess', range: 160, dmg: 60, lastAtk: 0 },
+            { id: 'pk', team: 'player', x: 175, y: 520, hp: 3000, max: 3000, type: 'king', range: 180, dmg: 80, lastAtk: 0 },
+            { id: 'pl', team: 'player', x: 80, y: 460, hp: 1800, max: 1800, type: 'princess', range: 160, dmg: 60, lastAtk: 0 },
+            { id: 'pr', team: 'player', x: 270, y: 460, hp: 1800, max: 1800, type: 'princess', range: 160, dmg: 60, lastAtk: 0 }
+        ];
+
+        towers.forEach(t => {
+            t.alive = true;
+            const div = document.createElement('div');
+            div.id = t.id; div.className = `tower ${t.team} ${t.type}`;
+            div.style.left = (t.x - 30) + 'px'; div.style.top = (t.y - 30) + 'px';
+            const icon = t.type === 'king' ? '💤' : '🎯';
+            div.innerHTML = `<div class="hp-container"><div id="hp-${t.id}" class="hp-fill"></div></div><div class="tower-top"></div><div id="icon-${t.id}" class="tower-body">${icon}</div>`;
+            document.getElementById('arena').appendChild(div);
+        });
+
+        const hand = document.getElementById('hand');
+        hand.innerHTML = '';
+        playerDeck.forEach(k => {
+            const card = document.createElement('div');
+            card.className = 'hand-card';
+            card.innerHTML = `<div class="card-cost">${DATA[k].cost}</div>${DATA[k].sym}`;
+            card.onclick = (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.hand-card').forEach(c => c.classList.remove('active'));
+                selected = k; card.classList.add('active');
+            };
+            hand.appendChild(card);
+        });
+        
+        gameLoopInterval = setInterval(gameLoop, 30);
+        aiLoopInterval = setInterval(aiLoop, 3000);
+    }
+
+    function spawnPlayerUnit(e) {
+        if(!selected || gameOver) return;
+        const rect = document.getElementById('arena').getBoundingClientRect();
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        if(y > 300 && playerElixir >= DATA[selected].cost) {
+            playerElixir -= DATA[selected].cost;
+            const count = DATA[selected].count || 1;
+            for(let i=0; i<count; i++) {
+                let offX = (Math.random() - 0.5) * 40;
+                let offY = (Math.random() - 0.5) * 40;
+                createUnit('player', selected, x + offX, y + offY);
+            }
+            selected = null;
+            document.querySelectorAll('.hand-card').forEach(c => c.classList.remove('active'));
+        }
+    }
+
+    function createUnit(team, type, x, y) {
+        const u = { id: Math.random(), team, type, x, y, hp: DATA[type].hp, max: DATA[type].hp, stats: DATA[type], lastAtk: 0 };
+        const size = (type === 'skeletons' || type === 'goblins' || type === 'minions') ? 20 : (DATA[type].type === 'building' ? 35 : 30);
+        const d = document.createElement('div');
+        d.className = `unit ${u.stats.flying ? 'flying' : ''}`;
+        
+        let bg = team=='player'?'#3498db':'#e74c3c';
+        if (DATA[type].type === 'building') { bg = '#555'; d.style.borderRadius = '5px'; }
+
+        d.style.cssText = `width:${size}px; height:${size}px; background:${bg}; font-size:${size/1.5}px; transition: transform 0.1s; left:${x}px; top:${y}px;`;
+        d.innerHTML = `<div class="unit-hp" style="width:${size-6}px"><div class="fill" style="width:100%"></div></div>${u.stats.sym}`;
+        document.getElementById('entities-layer').appendChild(d);
+        u.dom = d;
+        entities.push(u);
+    }
+
+    function shootProjectile(sx, sy, tx, ty, isArrow) {
+        const p = document.createElement('div');
+        p.className = isArrow ? 'arrow' : 'fireball';
+        document.getElementById('arena').appendChild(p);
+        let progress = 0;
+        const ang = Math.atan2(ty - sy, tx - sx);
+        const itv = setInterval(() => {
+            progress += 0.15;
+            const cx = sx + (tx - sx) * progress;
+            const cy = sy + (ty - sy) * progress;
+            p.style.transform = `translate(${cx}px, ${cy}px) rotate(${ang}rad)`;
+            if(progress >= 1) { clearInterval(itv); p.remove(); }
+        }, 20);
+    }
+
+    function gameLoop() {
+        if(gameOver) return;
+        playerElixir = Math.min(10, playerElixir + 0.02);
+        document.getElementById('elixir-progress').style.width = (playerElixir * 10) + '%';
+        document.getElementById('elixir-text').innerText = Math.floor(playerElixir);
+
+        towers.forEach(t => {
+            if(!t.alive) return;
+            if(t.type === 'king') {
+                const myPrincesses = towers.filter(tw => tw.team === t.team && tw.type === 'princess' && tw.alive);
+                if(myPrincesses.length === 2) { return; } 
+                else { document.getElementById(`icon-${t.id}`).innerText = "👑"; }
+            }
+            let target = null, minDist = t.range;
+            entities.forEach(e => {
+                if(e.team !== t.team) {
+                    const dist = Math.hypot(e.x - t.x, e.y - t.y);
+                    if(dist < minDist) { minDist = dist; target = e; }
+                }
+            });
+            if(target && Date.now() - t.lastAtk > 1000) { 
+                const isArrow = (t.type === 'princess');
+                shootProjectile(t.x, t.y, target.x, target.y, isArrow);
+                target.hp -= t.dmg;
+                t.lastAtk = Date.now();
+            }
+            const bar = document.getElementById(`hp-${t.id}`);
+            if(bar) bar.style.width = Math.max(0, (t.hp/t.max*100)) + '%';
+            if(t.hp <= 0) {
+                t.alive = false; 
+                document.getElementById(t.id).style.filter = "grayscale(1) brightness(0.5)";
+                if(t.type === 'king') endGame(t.team === 'enemy');
+            }
+        });
+
+        const AGGRO_RANGE = 140;
+        entities.forEach(u => {
+            if (u.stats.type === 'building') {
+                let target = null, minDist = u.stats.range;
+                entities.forEach(e => {
+                    if(e.team !== u.team) {
+                        if (u.stats.name === 'Cañón' && e.stats.flying) return;
+                        const dist = Math.hypot(e.x - u.x, e.y - u.y);
+                        if(dist < minDist) { minDist = dist; target = e; }
+                    }
+                });
+                if(target && Date.now() - u.lastAtk > 1200) {
+                    shootProjectile(u.x, u.y, target.x, target.y, false);
+                    target.hp -= u.stats.dmg;
+                    u.lastAtk = Date.now();
+                }
+                u.dom.querySelector('.fill').style.width = Math.max(0, (u.hp/u.max*100)) + '%';
+                if(u.hp <= 0) { u.dom.remove(); entities.splice(entities.indexOf(u), 1); }
+                return; 
+            }
+
+            let target = null;
+            let minDist = 9999;
+            let possibleTargets = [];
+            
+            const isValidTarget = (enemy) => {
+                if (enemy.stats.flying) {
+                    if (u.stats.type === 'range') return true;
+                    if (u.stats.flying) return true; 
+                    return false; 
+                }
+                return true; 
+            };
+
+            if (u.stats.type === 'siege') {
+                const enemyBuildings = entities.filter(e => e.team !== u.team && e.stats.type === 'building');
+                const enemyTowers = towers.filter(t => t.alive && t.team !== u.team);
+                possibleTargets = enemyBuildings.concat(enemyTowers);
+            } else {
+                const enemyUnits = entities.filter(e => e.team !== u.team && isValidTarget(e));
+                const closeEnemies = enemyUnits.filter(e => Math.hypot(e.x - u.x, e.y - u.y) <= AGGRO_RANGE);
+                if (closeEnemies.length > 0) possibleTargets = closeEnemies;
+                else possibleTargets = towers.filter(t => t.alive && t.team !== u.team).concat(entities.filter(e => e.team !== u.team && e.stats.type === 'building'));
+            }
+
+            possibleTargets.forEach(t => {
+                const d = Math.hypot(t.x - u.x, t.y - u.y);
+                if(d < minDist) { minDist = d; target = t; }
+            });
+
+            let moveX = 0, moveY = 0;
+            if(target) {
+                const dist = Math.hypot(target.x - u.x, target.y - u.y);
+                if(dist <= u.stats.range) {
+                    if(Date.now() - u.lastAtk > 1500) {
+                        u.lastAtk = Date.now();
+                        if(u.stats.type === 'area') {
+                            u.dom.style.transition = "transform 0.3s";
+                            u.dom.style.transform = "rotate(360deg)";
+                            setTimeout(() => { u.dom.style.transform = "rotate(0deg)"; u.dom.style.transition = "transform 0.1s"; }, 300);
+                            entities.forEach(enemy => {
+                                if(enemy.team !== u.team && !enemy.stats.flying && Math.hypot(enemy.x - u.x, enemy.y - u.y) <= u.stats.range + 15) {
+                                    enemy.hp -= u.stats.dmg;
+                                }
+                            });
+                        } 
+                        else if (u.stats.splash) {
+                            if (u.stats.type === 'range') shootProjectile(u.x, u.y, target.x, target.y, false);
+                            entities.forEach(enemy => {
+                                if(enemy.team !== u.team && Math.hypot(enemy.x - target.x, enemy.y - target.y) <= 40) { 
+                                    enemy.hp -= u.stats.dmg;
+                                }
+                            });
+                            towers.forEach(twr => {
+                                if(twr.team !== u.team && twr.alive && Math.hypot(twr.x - target.x, twr.y - target.y) <= 40) {
+                                    twr.hp -= u.stats.dmg;
+                                }
+                            });
+                            if (!entities.includes(target)) target.hp -= u.stats.dmg; 
+                        }
+                        else {
+                            target.hp -= u.stats.dmg;
+                            if(u.stats.type === 'range') shootProjectile(u.x, u.y, target.x, target.y, true);
+                            else {
+                                u.dom.style.transform = 'scale(1.2)';
+                                setTimeout(()=> u.dom.style.transform = 'scale(1)', 150);
+                            }
+                        }
+                    }
+                } else {
+                    let tx = target.x, ty = target.y;
+                    const mySide = (u.y < 275) ? 'top' : 'bottom';
+                    const targetSide = (target.y < 275) ? 'top' : 'bottom';
+                    const ignoresTerrain = u.stats.flying || (u.stats.name === 'Montapuercos');
+                    if (!ignoresTerrain && mySide !== targetSide) {
+                        const distLeft = Math.hypot(u.x - 90, u.y - 275);
+                        const distRight = Math.hypot(u.x - 260, u.y - 275);
+                        const bridgeX = (distLeft < distRight) ? 90 : 260;
+                        if (Math.abs(u.x - bridgeX) > 10) {
+                            tx = bridgeX; ty = u.y; 
+                            ty = (mySide === 'top') ? 250 : 300; 
+                        } else {
+                            tx = bridgeX; ty = (mySide === 'top') ? 300 : 250; 
+                        }
+                    }
+                    const angle = Math.atan2(ty - u.y, tx - u.x);
+                    moveX = Math.cos(angle) * u.stats.spd;
+                    moveY = Math.sin(angle) * u.stats.spd;
+                }
+            }
+            u.x += moveX; u.y += moveY;
+            u.dom.style.left = (u.x - 15) + 'px';
+            u.dom.style.top = (u.y - 15) + 'px';
+            u.dom.querySelector('.fill').style.width = Math.max(0, (u.hp/u.max*100)) + '%';
+            if(u.hp <= 0) { u.dom.remove(); entities.splice(entities.indexOf(u), 1); }
+        });
+    }
+
+    function endGame(victory) {
+        gameOver = true;
+        clearInterval(gameLoopInterval);
+        clearInterval(aiLoopInterval);
+        const ov = document.getElementById('end-overlay');
+        const msg = document.getElementById('end-msg');
+        const cupChangeText = document.getElementById('cups-change');
+        ov.style.display = 'flex';
+        
+        if (victory) {
+            msg.innerText = "¡VICTORIA!"; msg.style.color = "#2ecc71";
+            playerCups += 30; cupChangeText.innerText = "+30 🏆"; cupChangeText.style.color = "#2ecc71";
+        } else {
+            msg.innerText = "DERROTA"; msg.style.color = "#e74c3c";
+            playerCups = Math.max(0, playerCups - 25); cupChangeText.innerText = "-25 🏆"; cupChangeText.style.color = "#e74c3c";
+        }
+        localStorage.setItem('clashCups', playerCups);
+    }
+
+    function aiLoop() {
+        if(gameOver) return;
+        const keys = Object.keys(DATA);
+        const randKey = keys[Math.floor(Math.random()*keys.length)];
+        const count = DATA[randKey].count || 1;
+        const startX = Math.random()*200 + 75;
+        const startY = 60;
+        for(let i=0; i<count; i++) {
+            let offX = (Math.random() - 0.5) * 40;
+            let offY = (Math.random() - 0.5) * 40;
+            createUnit('enemy', randKey, startX + offX, startY + offY);
+        }
+    }
+
+    // INICIO
+    initLobby(); 
+</script>
+</body>
+</html>
